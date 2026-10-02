@@ -164,7 +164,7 @@ function tableFromGrid(xs,ys,ink,localWidth,pixels,imageWidth,lines,offset,canRe
   if(visible/Math.max(effective,1)<.2)return null;
   return {table,retry,extents,xs:globalX,ys:globalY};
 }
-function grid(source,lines,cv,offset=[0,0],edgeRules=false){
+function grid(source,lines,cv,offset=[0,0],edgeRules=false,imageSize=[source.width,source.height]){
   const rgba=cv.imread(source),gray=new cv.Mat(),ink=new cv.Mat(),labels=new cv.Mat(),stats=new cv.Mat(),centroids=new cv.Mat();
   let horizontal,vertical,joined,closed,solid;
   try{
@@ -183,12 +183,29 @@ function grid(source,lines,cv,offset=[0,0],edgeRules=false){
       for(let y=top;y<top+height;y++)for(let x=left;x<left+width;x++){const p=y*source.width+x;if(labels.data32S[p]===index){if(vertical.data[p])xCounts[x-left]++;if(horizontal.data[p])yCounts[y-top]++;}}
       const xs=positions(xCounts,Math.max(20,height*.35)).map(x=>x+left),ys=positions(yCounts,Math.max(30,width*.35)).map(y=>y+top);
       if(xs.length&&xs[0]-left>5&&left>0)xs.unshift(left);if(ys.length&&ys[0]-top>5&&top>0)ys.unshift(top);
+      const clippedEdges=[];
+      // A screenshot may end inside its last column. Repeated horizontal rules
+      // reaching the actual image edge establish its visible width; an arbitrary
+      // local analysis crop does not establish another column boundary.
+      if(xs.length>=2&&ys.length>=3&&offset[0]+source.width===imageSize[0]&&left+width>=source.width-2&&source.width-xs.at(-1)>5){
+        const start=xs.at(-1)+3,total=source.width-start;
+        const reaching=ys.filter(y=>{let present=0;for(let x=start;x<source.width;x++)if([-1,0,1].some(delta=>y+delta>=0&&y+delta<source.height&&horizontal.data[(y+delta)*source.width+x]))present++;return total>0&&present/total>.85;});
+        if(reaching.length>=3){xs.push(source.width);clippedEdges.push('right');}
+      }
       // A full-width title band above a real grid belongs to the slide heading,
       // not an extra row. At least one interior column rule must enter that row.
       while(ys.length>3&&xs.length>2){let present=0,total=0;for(const x of xs.slice(1,-1))for(let y=ys[0]+3;y<ys[1]-2;y++){total++;if([x-2,x-1,x,x+1,x+2].some(column=>vertical.data[y*source.width+column]))present++;}if(!total||present/total>=.15)break;ys.shift();}
       if(xs.length<3||ys.length<3||xs.some((x,i)=>i&&x-xs[i-1]<5)||ys.some((y,i)=>i&&y-ys[i-1]<5))continue;
       const result=tableFromGrid(xs,ys,ink.data,source.width,pixels,source.width,lines.map(line=>({...line,box:[line.box[0]-offset[0],line.box[1]-offset[1],line.box[2],line.box[3]],...(line.inkBox?{inkBox:[line.inkBox[0]-offset[0],line.inkBox[1]-offset[1],line.inkBox[2],line.inkBox[3]]}:{})})),[0,0],false);
-      if(result){result.table.box[0]+=offset[0];result.table.box[1]+=offset[1];result.xs=result.xs.map(x=>x+offset[0]);result.ys=result.ys.map(y=>y+offset[1]);return result;}
+      if(result){
+        const bottom=ys.at(-1),globalBottom=bottom+offset[1];
+        if(offset[1]+source.height===imageSize[1]&&source.height-bottom>4&&top+height>=source.height-2&&lines.some(line=>center(line)[1]>globalBottom&&line.box[1]+line.box[3]>=imageSize[1]-2&&center(line)[0]>=xs[0]+offset[0]&&center(line)[0]<xs.at(-1)+offset[0])){
+          let continuing=0;for(const x of xs.slice(1,-1)){let present=0;for(let y=bottom+2;y<source.height;y++)if([-1,0,1].some(delta=>vertical.data[y*source.width+x+delta]))present++;if(present>=(source.height-bottom-2)*.7)continuing++;}
+          if(continuing>=2)clippedEdges.push('bottom');
+        }
+        if(clippedEdges.length)result.table.clippedEdges=clippedEdges;
+        result.table.box[0]+=offset[0];result.table.box[1]+=offset[1];result.xs=result.xs.map(x=>x+offset[0]);result.ys=result.ys.map(y=>y+offset[1]);return result;
+      }
     }return null;
   }finally{free(rgba,gray,ink,horizontal,vertical,joined,closed,solid,labels,stats,centroids);}
 }
@@ -208,7 +225,7 @@ function denseGrids(source,lines,cv,contours){
     const extent=[...candidate.members,...headers],first=Math.min(...extent.map(c=>c.box[0])),cellWidth=median(candidate.members.map(c=>c.box[2])),legend=extent.some(cell=>Math.abs(cell.box[0]-first)<4&&cell.box[2]>cellWidth*1.25),right=Math.min(source.width,Math.max(...extent.map(c=>c.box[0]+c.box[2]))+5),left=Math.max(0,first-(legend?3:cellWidth*2+5)),headerLines=lines.filter(line=>center(line)[1]>=candidate.top-candidate.height*1.4&&center(line)[1]<candidate.top&&line.box[0]>=first&&line.box[0]<right&&number(line.text)===null),headerTop=!headers.length&&headerLines.length>=3?candidate.top-candidate.height:candidate.top,top=Math.max(0,Math.min(headerTop,...headers.map(c=>c.box[1]))-3),bottom=Math.min(source.height,candidate.bottom+4);
     const patch=crop(source,[left,top,right-left,bottom-top]);
     let best=null;
-    for(const edges of [true,245,false,'color']){const result=grid(patch,lines,cv,[left,top],edges);if(result&&result.table.rows.length>=3&&result.table.rows[0].length>=3&&(!best||result.table.rows.length*result.table.rows[0].length>best.table.rows.length*best.table.rows[0].length))best=result;}
+    for(const edges of [true,245,false,'color']){const result=grid(patch,lines,cv,[left,top],edges,[source.width,source.height]);if(result&&result.table.rows.length>=3&&result.table.rows[0].length>=3&&(!best||result.table.rows.length*result.table.rows[0].length>best.table.rows.length*best.table.rows[0].length))best=result;}
     patch.width=1;patch.height=1;
     if(best&&!results.some(result=>result.table.box.every((value,i)=>Math.abs(value-best.table.box[i])<8)))results.push(best);
   }return results.sort((a,b)=>a.table.box[1]-b.table.box[1]||a.table.box[0]-b.table.box[0]);
@@ -249,7 +266,7 @@ function localGrids(source,lines,cv,contours){
     const clipped=bounds(box,source.width,source.height,3),patch=crop(source,clipped),offset=clipped.slice(0,2);
     let best=null;
     for(const mode of [true,false,245,'color']){
-      const candidate=grid(patch,lines,cv,offset,mode);if(!candidate)continue;
+      const candidate=grid(patch,lines,cv,offset,mode,[source.width,source.height]);if(!candidate)continue;
       if(!best||candidate.table.rows.length*candidate.table.rows[0].length>best.table.rows.length*best.table.rows[0].length)best=candidate;
     }
     patch.width=1;patch.height=1;
@@ -823,6 +840,8 @@ export async function analyzePage(page,{cv,recognize,signal}={}){
   analysisSource.width=1;analysisSource.height=1;
   abort(signal);const nativeTables=detectedTables.map(result=>result.table),table=nativeTables[0]||null,tables=nativeTables.map(table=>({box:table.box,table})),charts=typeof chartsFromTables==='function'?chartsFromTables(nativeTables,source,cv,contentLines):nativeTables.map(table=>chartFromTable(table,source,cv)).filter(Boolean),issues=[];
   const excluded=[...tables,...charts,...embedded].map(item=>item.box),retainedCharts=[];
+  if(nativeTables.some(table=>table.clippedEdges?.includes('right')))issues.push('表格右外框已被截斷，已保留可見的最右欄；請補完整截圖核對欄寬及內容。');
+  if(nativeTables.some(table=>table.clippedEdges?.includes('bottom')))issues.push('表格最底列文字已被截斷，只匯出有完整上下格線的列；請補完整截圖。');
   if(embedded.some(picture=>picture.kind==='document'))issues.push('內嵌報表的細小儲存格無法可靠辨識，已保留原始圖片；此報表內容仍需原始 Excel/PDF 才能完整編輯。');
   if(embedded.some(picture=>picture.kind==='drawing'))issues.push('內嵌工程圖已保留圖片，其線條／尺寸仍需原始圖檔才能完整編輯。');
   if(detectedTables.some(result=>result.disagreements?.length))issues.push('部分儲存格的原辨識與細格辨識不同，已保留原辨識文字，請核對數字。');

@@ -199,11 +199,11 @@ async function xlsx(tablesInput, numeric = false, sheetNames) {
   const fonts = ['000000','FFFFFF'].map(c=>`<font><sz val="10"/><color rgb="FF${c}"/><name val="${FONT}"/><family val="2"/></font>`).join('');
   const xfs = colors.map((c,i) => {
     const rgb = [0,2,4].map(n=>parseInt(c.slice(n,n+2),16)), dark = rgb[0]*299+rgb[1]*587+rgb[2]*114<128000;
-    return `<xf numFmtId="49" fontId="${+dark}" fillId="${i+2}" borderId="0" xfId="0" applyAlignment="1" applyNumberFormat="1"><alignment vertical="center" wrapText="1"/></xf>`;
+    return `<xf numFmtId="49" fontId="${+dark}" fillId="${i+2}" borderId="1" xfId="0" applyBorder="1" applyAlignment="1" applyNumberFormat="1"><alignment vertical="center" wrapText="1"/></xf>`;
   });
   if (numeric) xfs.push('<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="10" fontId="0" fillId="0" borderId="0" xfId="0"/>');
   const borders = ['left','right','top','bottom'].map(edge=>`<${edge} style="thin"><color rgb="FF000000"/></${edge}>`).join('');
-  const parts = {'xl/styles.xml':HEADER+`<styleSheet xmlns="${NS.s}"><fonts count="2">${fonts}</fonts><fills count="${colors.length+2}">${fills}</fills><borders count="1"><border>${borders}<diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="${xfs.length}">${xfs.join('')}</cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`};
+  const parts = {'xl/styles.xml':HEADER+`<styleSheet xmlns="${NS.s}"><fonts count="2">${fonts}</fonts><fills count="${colors.length+2}">${fills}</fills><borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border><border>${borders}<diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="${xfs.length}">${xfs.join('')}</cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`};
   for (let index=0;index<data.length;index++) {
     const table = data[index];
     const columns = table.widths.map((width,c)=>`<col min="${c+1}" max="${c+1}" width="${clamp((width-5)/7,1,255).toFixed(3)}" customWidth="1"/>`).join('');

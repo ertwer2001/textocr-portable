@@ -1,5 +1,5 @@
 /* Only application assets are cached. Imported user files never enter this cache. */
-const VERSION='textocr-web-20261002-r5';
+const VERSION='textocr-web-20261002-r6';
 const CORE=['./','index.html','style.css','app.js','analysis.js','exports.js','ocr.js','ocr.worker.js','icon.svg','manifest.webmanifest','licenses.html','asset-manifest.json','models/manifest.json','vendor/jszip.min.js'];
 self.addEventListener('install',event=>{event.waitUntil(caches.open(VERSION).then(cache=>cache.addAll(CORE)).then(()=>self.skipWaiting()));});
 self.addEventListener('activate',event=>{event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(key=>key.startsWith('textocr-web-')&&key!==VERSION).map(key=>caches.delete(key)))).then(()=>self.clients.claim()));});
