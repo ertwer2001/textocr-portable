@@ -101,13 +101,23 @@ function contourBoxes(cv, source, inkContours=true) {
   } finally {free(rgba,gray,edges,contours,hierarchy);}
 }
 
-function tableFromGrid(xs,ys,ink,localWidth,pixels,imageWidth,lines,offset,canRetry) {
+function cellText(members){
+  const rows=[];
+  for(const line of [...members].sort((a,b)=>a.box[1]+a.box[3]/2-b.box[1]-b.box[3]/2)){
+    const cy=line.box[1]+line.box[3]/2,row=rows.find(row=>Math.abs(row.cy-cy)<Math.min(row.height,line.box[3])*.4);
+    if(row){row.lines.push(line);row.cy=(row.cy*(row.lines.length-1)+cy)/row.lines.length;row.height=Math.min(row.height,line.box[3]);}
+    else rows.push({cy,height:line.box[3],lines:[line]});
+  }
+  return rows.sort((a,b)=>a.cy-b.cy).map(row=>row.lines.sort((a,b)=>a.box[0]-b.box[0]).map(line=>line.text).join(' ')).join('\n');
+}
+function tableFromGrid(xs,ys,ink,localWidth,pixels,imageWidth,lines,offset,canRetry,rules={}) {
+  const horizontalInk=rules.horizontal||ink,verticalInk=rules.vertical||ink;
   const columns=xs.length-1, rows=ys.length-1, parents=Array.from({length:columns*rows},(_,i)=>i);
   const find = cell => {while(parents[cell]!==cell){parents[cell]=parents[parents[cell]];cell=parents[cell];}return cell;};
   const join = (a,b) => {a=find(a);b=find(b);parents[Math.max(a,b)]=Math.min(a,b);};
   for(let r=0;r<rows;r++)for(let c=0;c<columns;c++){
-    if(c+1<columns){let present=0,total=0;for(let y=ys[r]+3;y<ys[r+1]-2;y++){total++;if([-2,-1,0,1,2].some(delta=>ink[y*localWidth+xs[c+1]+delta]))present++;}if(total && present/total<.3)join(r*columns+c,r*columns+c+1);}
-    if(r+1<rows){let present=0,total=0;for(let x=xs[c]+3;x<xs[c+1]-2;x++){total++;if([-2,-1,0,1,2].some(delta=>ink[(ys[r+1]+delta)*localWidth+x]))present++;}if(total && present/total<.3)join(r*columns+c,(r+1)*columns+c);}
+    if(c+1<columns){let present=0,total=0;for(let y=ys[r]+3;y<ys[r+1]-2;y++){total++;if([-2,-1,0,1,2].some(delta=>verticalInk[y*localWidth+xs[c+1]+delta]))present++;}if(total && present/total<.3)join(r*columns+c,r*columns+c+1);}
+    if(r+1<rows){let present=0,total=0;for(let x=xs[c]+3;x<xs[c+1]-2;x++){total++;if([-2,-1,0,1,2].some(delta=>horizontalInk[(ys[r+1]+delta)*localWidth+x]))present++;}if(total && present/total<.3)join(r*columns+c,(r+1)*columns+c);}
   }
   const groups=new Map(), anchors=new Map(), extents=new Map(), merges=[];
   for(let cell=0;cell<parents.length;cell++){const id=find(cell);if(!groups.has(id))groups.set(id,[]);groups.get(id).push([Math.floor(cell/columns),cell%columns]);}
@@ -127,7 +137,7 @@ function tableFromGrid(xs,ys,ink,localWidth,pixels,imageWidth,lines,offset,canRe
     if(targets.size>1 || (x<globalX[0]-3 && x+w>globalX[0]+3)){targets.forEach(target=>retry.add(target));if(canRetry)continue;}
     if(c>=0 && c<columns){const anchor=anchors.get(r*columns+c)??r*columns+c;buckets[Math.floor(anchor/columns)][anchor%columns].push(line);}
   }
-  const values=buckets.map(row=>row.map(cell=>cell.sort((a,b)=>a.box[1]-b.box[1]||a.box[0]-b.box[0]).map(line=>line.text).join('\n'))),fills=[];
+  const values=buckets.map(row=>row.map(cell=>cellText(cell))),fills=[];
   for(let r=0;r<rows;r++){
     const fill=[];
     for(let c=0;c<columns;c++){
@@ -162,7 +172,12 @@ function tableFromGrid(xs,ys,ink,localWidth,pixels,imageWidth,lines,offset,canRe
   const table={rows:values,widths:xs.slice(1).map((x,i)=>x-xs[i]),heights:ys.slice(1).map((y,i)=>y-ys[i]),fills,cellStyles,borderColor,borderWidth:1,merges,box:[globalX[0],globalY[0],globalX.at(-1)-globalX[0],globalY.at(-1)-globalY[0]]};
   const visible=lines.filter(line=>inside(center(line),table.box)).length,effective=rows*columns-merges.reduce((sum,[r1,c1,r2,c2])=>sum+(r2-r1+1)*(c2-c1+1)-1,0);
   if(visible/Math.max(effective,1)<.2)return null;
-  return {table,retry,extents,xs:globalX,ys:globalY};
+  const tallRows=table.heights.map((height,row)=>height>median(table.heights)*3.2?row:-1).filter(row=>row>=0);
+  const tallRowsSupported=tallRows.length>0&&tallRows.every(row=>{
+    const expected=xs.slice(1,-1).map((_,column)=>column+1).filter(column=>(anchors.get(row*columns+column-1)??row*columns+column-1)!==(anchors.get(row*columns+column)??row*columns+column));
+    return expected.length>0&&expected.every(column=>{let present=0,total=0;for(let y=ys[row]+3;y<ys[row+1]-2;y++){total++;if([-2,-1,0,1,2].some(delta=>verticalInk[y*localWidth+xs[column]+delta]))present++;}return total>0&&present/total>.8;});
+  });
+  return {table,retry,extents,xs:globalX,ys:globalY,tallRowsSupported};
 }
 function grid(source,lines,cv,offset=[0,0],edgeRules=false,imageSize=[source.width,source.height]){
   const rgba=cv.imread(source),gray=new cv.Mat(),ink=new cv.Mat(),labels=new cv.Mat(),stats=new cv.Mat(),centroids=new cv.Mat();
@@ -196,7 +211,11 @@ function grid(source,lines,cv,offset=[0,0],edgeRules=false,imageSize=[source.wid
       // not an extra row. At least one interior column rule must enter that row.
       while(ys.length>3&&xs.length>2){let present=0,total=0;for(const x of xs.slice(1,-1))for(let y=ys[0]+3;y<ys[1]-2;y++){total++;if([x-2,x-1,x,x+1,x+2].some(column=>vertical.data[y*source.width+column]))present++;}if(!total||present/total>=.15)break;ys.shift();}
       if(xs.length<3||ys.length<3||xs.some((x,i)=>i&&x-xs[i-1]<5)||ys.some((y,i)=>i&&y-ys[i-1]<5))continue;
-      const result=tableFromGrid(xs,ys,ink.data,source.width,pixels,source.width,lines.map(line=>({...line,box:[line.box[0]-offset[0],line.box[1]-offset[1],line.box[2],line.box[3]],...(line.inkBox?{inkBox:[line.inkBox[0]-offset[0],line.inkBox[1]-offset[1],line.inkBox[2],line.inkBox[3]]}:{})})),[0,0],false);
+      // Long global kernels locate a table, but short cell rules can be broken
+      // by intersections in Canny. Use cell-sized kernels for merge evidence.
+      const mergeHorizontal=morph(cv,ink,cv.MORPH_OPEN,Math.max(10,median(xs.slice(1).map((x,i)=>x-xs[i]))*.35),1),mergeVertical=morph(cv,ink,cv.MORPH_OPEN,1,Math.max(6,median(ys.slice(1).map((y,i)=>y-ys[i]))*.5));
+      let result;
+      try{result=tableFromGrid(xs,ys,ink.data,source.width,pixels,source.width,lines.map(line=>({...line,box:[line.box[0]-offset[0],line.box[1]-offset[1],line.box[2],line.box[3]],...(line.inkBox?{inkBox:[line.inkBox[0]-offset[0],line.inkBox[1]-offset[1],line.inkBox[2],line.inkBox[3]]}:{})})),[0,0],false,{horizontal:mergeHorizontal.data,vertical:mergeVertical.data});}finally{free(mergeHorizontal,mergeVertical);}
       if(result){
         const bottom=ys.at(-1),globalBottom=bottom+offset[1];
         if(offset[1]+source.height===imageSize[1]&&source.height-bottom>4&&top+height>=source.height-2&&lines.some(line=>center(line)[1]>globalBottom&&line.box[1]+line.box[3]>=imageSize[1]-2&&center(line)[0]>=xs[0]+offset[0]&&center(line)[0]<xs.at(-1)+offset[0])){
@@ -235,12 +254,14 @@ function denseGrid(source,lines,cv,contours){return denseGrids(source,lines,cv,c
 // enclosing rectangle before projecting rules; never project all cards together.
 function localGrids(source,lines,cv,contours){
   const regions=[];
-  const rgba=cv.imread(source),gray=new cv.Mat(),edges=new cv.Mat();let horizontal,vertical,uprightClosed;
+  const rgba=cv.imread(source),gray=new cv.Mat(),edges=new cv.Mat();let horizontal,vertical,uprightClosed,horizontalClosed;
   try{
     cv.cvtColor(rgba,gray,cv.COLOR_RGBA2GRAY);cv.Canny(gray,edges,20,60);horizontal=morph(cv,edges,cv.MORPH_OPEN,Math.max(35,source.width/20),1);
+    horizontalClosed=morph(cv,horizontal,cv.MORPH_CLOSE,7,1);
     vertical=morph(cv,edges,cv.MORPH_OPEN,1,Math.max(12,source.height/60));uprightClosed=morph(cv,vertical,cv.MORPH_CLOSE,3,7);const uprights=components(cv,uprightClosed).map(item=>item.box);
+    for(const rules of [horizontal,horizontalClosed]){
     const groups=[];
-    for(const {box:[x,y,w,h]}of components(cv,horizontal).sort((a,b)=>a.box[1]-b.box[1])){
+    for(const {box:[x,y,w,h]}of components(cv,rules).sort((a,b)=>a.box[1]-b.box[1])){
       if(w<source.width*.12||h>8)continue;
       let group=groups.find(group=>Math.abs(median(group.map(box=>box[0]))-x)<8&&Math.abs(median(group.map(box=>box[0]+box[2]))-x-w)<8);
       if(!group){group=[];groups.push(group);}group.push([x,y,w,h]);
@@ -248,12 +269,16 @@ function localGrids(source,lines,cv,contours){
     for(const group of groups){
       const ys=positions(Array.from({length:source.height},(_,y)=>group.some(box=>y>=box[1]&&y<box[1]+box[3])?1:0),1);
       const runs=[];for(const y of ys){if(!runs.length||y-runs.at(-1).at(-1)>source.height*.25)runs.push([y]);else runs.at(-1).push(y);}
-      for(const run of runs)if(run.length>=3){
+      for(const run of runs)if(run.length>=2){
         const x=median(group.map(box=>box[0])),right=median(group.map(box=>box[0]+box[2])),top=run[0],bottom=run.at(-1),columns=uprights.filter(([vx,vy,vw,vh])=>vx>=x-5&&vx+vw<=right+5&&Math.min(bottom,vy+vh)-Math.max(top,vy)>(bottom-top)*.45);
-        regions.push([x,Math.min(top,...columns.map(box=>box[1])),right-x,Math.max(bottom,...columns.map(box=>box[1]+box[3]))-Math.min(top,...columns.map(box=>box[1]))+1]);
+        // Closing broken intersections rescues a short merged header. It must
+        // not alter the established projection of a tall coloured data table.
+        if(rules===horizontalClosed&&(run.length!==2||bottom-top>source.height*.15))continue;
+        if(run.length>=3||columns.length>=3&&bottom-top>=25)regions.push([x,Math.min(top,...columns.map(box=>box[1])),right-x,Math.max(bottom,...columns.map(box=>box[1]+box[3]))-Math.min(top,...columns.map(box=>box[1]))+1]);
       }
     }
-  }finally{free(rgba,gray,edges,horizontal,vertical,uprightClosed);}
+    }
+  }finally{free(rgba,gray,edges,horizontal,vertical,uprightClosed,horizontalClosed);}
   for(const {box,area,points}of contours){
     const [x,y,w,h]=box;
     if(points.length!==4||area/(w*h)<.85||w<80||h<45||w*h<source.width*source.height*.015)continue;
@@ -624,6 +649,36 @@ function pictures(source,pixels,lines,excluded,cv){
     return found.map(item=>({...item,canvas:crop(source,item.box)}));
   }finally{free(mask,opened,closed,colorful,colorClosed);}
 }
+
+// A logo can occupy an otherwise empty merged table cell. Detect it before
+// table exclusions, but accept only one-cell images with no outside cell text;
+// a coloured multi-row table or shaded text panel remains native text.
+function tablePictures(source,pixels,lines,tables,excluded,cv){
+  if(!tables.length)return [];
+  const candidates=pictures(source,pixels,lines,excluded,cv),accepted=[];
+  for(const picture of candidates){
+    const [px,py,pw,ph]=picture.box;
+    for(const table of tables){
+      const xs=[table.box[0]],ys=[table.box[1]];
+      for(const width of table.widths)xs.push(xs.at(-1)+width);
+      for(const height of table.heights)ys.push(ys.at(-1)+height);
+      let found=false;
+      for(let r=0;r<table.rows.length&&!found;r++)for(let c=0;c<table.widths.length&&!found;c++){
+        const merge=(table.merges||[]).find(([r1,c1,r2,c2])=>r>=r1&&r<=r2&&c>=c1&&c<=c2);
+        if(!merge||r!==merge[0]||c!==merge[1])continue;
+        const r2=merge?.[2]??r,c2=merge?.[3]??c,box=[xs[c],ys[r],xs[c2+1]-xs[c],ys[r2+1]-ys[r]];
+        if(px<box[0]-2||py<box[1]-2||px+pw>box[0]+box[2]+2||py+ph>box[1]+box[3]+2)continue;
+        const members=lines.filter(line=>inside(center(line),box));
+        if(members.some(line=>!inside(center(line),picture.box)))continue;
+        table.rows[r][c]='';if(table.cellStyles?.[r])table.cellStyles[r][c]={};
+        for(const line of members)line.preserveImage=true;
+        accepted.push(picture);found=true;
+      }
+      if(found)break;
+    }
+  }
+  return accepted;
+}
 function hsv(r,g,b){const high=Math.max(r,g,b),low=Math.min(r,g,b),delta=high-low;let hue=0;if(delta){if(high===r)hue=60*((g-b)/delta%6);else if(high===g)hue=60*((b-r)/delta+2);else hue=60*((r-g)/delta+4);}if(hue<0)hue+=360;return [hue/2,high?delta/high*255:0,high];}
 function tableSwatches(source,pixels,tables,charts,cv){
   if(!charts.length)return [];
@@ -683,7 +738,28 @@ function connectors(source,pixels,excluded,cv,objects=[]){
             continue;
           }
         }
-        if(w>h){let position=0,maximum=0;const counts=[];for(let row=y;row<y+h;row++){let n=0;for(let col=x;col<x+w;col++)if(mask.data[row*source.width+col])n++;if(n>maximum){maximum=n;position=row;}}for(let col=x;col<x+w;col++){let n=0;for(let row=y;row<y+h;row++)if(mask.data[row*source.width+col])n++;counts.push(n);}const step=Math.max(2,Math.ceil(w*.35)),first=Math.max(...counts.slice(0,step)),last=Math.max(...counts.slice(-step)),reverse=first>last+1;output.push({x1:reverse?x+w:x,y1:position,x2:reverse?x:x+w,y2:position,color:hex(rgb),width:1,arrow:Math.max(first,last)>=Math.max(4,Math.min(first,last)+2)});}
+        if(w>h){let position=0,maximum=0;const counts=[];for(let row=y;row<y+h;row++){let n=0;for(let col=x;col<x+w;col++)if(mask.data[row*source.width+col])n++;if(n>maximum){maximum=n;position=row;}}
+          if(bin===18&&h>4&&maximum>w*.6){
+            // An adjacent OCR label may cover the tiny head while leaving the
+            // shaft. Inspect a short source-pixel strip at each shaft end;
+            // a vertical branch has one thick column, a head several tapering
+            // columns. This does not reinterpret coloured flow U connectors.
+            const radius=4,profile=(start,end)=>{
+              const columns=[];for(let col=Math.max(0,start);col<=Math.min(source.width-1,end);col++){let n=0;for(let row=Math.max(0,position-radius);row<=Math.min(source.height-1,position+radius);row++)if(bins[row*source.width+col]===bin)n++;columns.push({col,count:n});}
+              const trimmed=columns.map(({count},index)=>h>radius*2&&count>=radius+1&&(columns[index-1]?.count||0)<=2&&(columns[index+1]?.count||0)<=2?1:count),wide=trimmed.filter(count=>count>=3).length,mass=trimmed.reduce((sum,count)=>sum+Math.max(0,count-1),0);
+              return {mass,head:wide>=3&&mass>=6,columns};
+            },first=profile(x-8,x+8),last=profile(x+w-8,x+w+8),reverse=first.head&&(!last.head||first.mass>last.mass+2),head=reverse?first:last;
+            const tip=head.columns.filter(item=>item.count>0);output.push({x1:reverse?x+w:x,y1:position,x2:head.head&&tip.length?(reverse?tip[0].col:tip.at(-1).col):(reverse?x:x+w),y2:position,color:hex(rgb),width:1,arrow:head.head});continue;
+          }
+          // A perpendicular branch is not an arrowhead. Compare only the ink
+          // close to the longest horizontal shaft, preserving the endpoint
+          // direction of both open and filled small heads.
+          const radius=Math.max(4,Math.min(8,Math.ceil(h*.35)));
+          for(let col=x;col<x+w;col++){let n=0;for(let row=Math.max(y,position-radius);row<=Math.min(y+h-1,position+radius);row++)if(mask.data[row*source.width+col])n++;counts.push(n);}
+          const step=Math.max(2,Math.ceil(w*.35)),first=Math.max(...counts.slice(0,step)),last=Math.max(...counts.slice(-step));
+          const branchFirst=first>=radius+1&&h>radius*2,branchLast=last>=radius+1&&h>radius*2;
+          const headFirst=branchFirst?1:first,headLast=branchLast?1:last,reverse=headFirst>headLast+1;
+          output.push({x1:reverse?x+w:x,y1:position,x2:reverse?x:x+w,y2:position,color:hex(rgb),width:1,arrow:Math.max(headFirst,headLast)>=Math.max(4,Math.min(headFirst,headLast)+2)});}
         else{const counts=[];for(let row=y;row<y+h;row++){let n=0;for(let col=x;col<x+w;col++)if(mask.data[row*source.width+col])n++;counts.push(n);}const step=Math.max(2,Math.ceil(h*.35)),first=Math.max(...counts.slice(0,step)),last=Math.max(...counts.slice(-step)),reverse=first>last+1;output.push({x1:x+w/2,y1:reverse?y+h:y,x2:x+w/2,y2:reverse?y:y+h,color:hex(rgb),width:1,arrow:Math.max(first,last)>=Math.max(4,Math.min(first,last)+2)});}
       }
     }finally{mask.delete();}
@@ -787,6 +863,7 @@ export async function analyzePage(page,{cv,recognize,signal}={}){
   if(!page?.canvas?.width||!page.canvas.height)throw new Error('找不到可辨識的原始圖片。');
   const source=page.canvas;page.width=source.width;page.height=source.height;
   page.lines=(page.lines||[]).filter(line=>line?.text&&line.box?.length===4).map((line,index)=>({...line,text:String(line.text),index,box:[...line.box]}));
+  for(const line of page.lines)if(/^(?:[□▢☐▯]\s*){3,}$/u.test(line.text)){line.preserveImage=true;line.preserveBoxSequence=true;}
   const pixels=source.getContext('2d',{willReadFrequently:true}).getImageData(0,0,source.width,source.height).data;
   typography(page.lines,pixels,source.width,source.height);await tick();abort(signal);
   const cache=new Map();
@@ -835,20 +912,24 @@ export async function analyzePage(page,{cv,recognize,signal}={}){
     detectedTables=detectedTables.filter(result=>!(inside(center({box:result.table.box}),candidate.table.box)||inside(center({box:candidate.table.box}),result.table.box))||result.table.rows[0].length>candidate.table.rows[0].length);
     detectedTables.push(candidate);
   }
-  detectedTables=detectedTables.filter(result=>Math.max(...result.table.heights)<=median(result.table.heights)*3.2).sort((a,b)=>a.table.box[1]-b.table.box[1]||a.table.box[0]-b.table.box[0]);
+  detectedTables=detectedTables.filter(result=>result.tallRowsSupported||Math.max(...result.table.heights)<=median(result.table.heights)*3.2).sort((a,b)=>a.table.box[1]-b.table.box[1]||a.table.box[0]-b.table.box[0]);
   for(const result of detectedTables){await retryCells(result,recognizeCell,signal);if(result.table.rows.flat().filter(text=>text.includes('%')).length>=5)await retryCells(result,recognizeCell,signal,true);recoveredCellStyles(result,pixels,source.width,source.height);}
   analysisSource.width=1;analysisSource.height=1;
   abort(signal);const nativeTables=detectedTables.map(result=>result.table),table=nativeTables[0]||null,tables=nativeTables.map(table=>({box:table.box,table})),charts=typeof chartsFromTables==='function'?chartsFromTables(nativeTables,source,cv,contentLines):nativeTables.map(table=>chartFromTable(table,source,cv)).filter(Boolean),issues=[];
-  const excluded=[...tables,...charts,...embedded].map(item=>item.box),retainedCharts=[];
+  const tableImages=tablePictures(source,pixels,page.lines,nativeTables,[...charts,...embedded].map(item=>item.box),cv);
+  const excluded=[...tables,...charts,...embedded,...tableImages].map(item=>item.box),retainedCharts=[];
   if(nativeTables.some(table=>table.clippedEdges?.includes('right')))issues.push('表格右外框已被截斷，已保留可見的最右欄；請補完整截圖核對欄寬及內容。');
   if(nativeTables.some(table=>table.clippedEdges?.includes('bottom')))issues.push('表格最底列文字已被截斷，只匯出有完整上下格線的列；請補完整截圖。');
   if(embedded.some(picture=>picture.kind==='document'))issues.push('內嵌報表的細小儲存格無法可靠辨識，已保留原始圖片；此報表內容仍需原始 Excel/PDF 才能完整編輯。');
   if(embedded.some(picture=>picture.kind==='drawing'))issues.push('內嵌工程圖已保留圖片，其線條／尺寸仍需原始圖檔才能完整編輯。');
+  if(page.lines.some(line=>line.preserveBoxSequence))issues.push('空框序列已保留原始像素與間距；若需調整各小框，請在文件中重新建立。');
+  const smallInk=page.lines.filter(line=>!line.preserveImage&&line.inkBox);
+  if(smallInk.length>=10&&median(smallInk.map(line=>line.inkBox[3]))<12)issues.push('圖片文字較小，辨識結果可能有錯字；請核對文字、英文縮寫及備註。');
   if(detectedTables.some(result=>result.disagreements?.length))issues.push('部分儲存格的原辨識與細格辨識不同，已保留原辨識文字，請核對數字。');
   for(const candidate of nativeTables)if(!charts.some(chart=>chart.sourceTableBox?.every((value,i)=>Math.abs(value-candidate.box[i])<5))&&candidate.rows.flat().filter(text=>text.includes('%')).length>5){issues.push('圖表資料尚未可靠辨識，原圖保留，請核對數字。');const [x,y,w]=candidate.box;if(y>source.height*.3){const box=[x,Math.floor(source.height*.16),w,y-Math.floor(source.height*.16)];retainedCharts.push(box);excluded.push(box);}}
   await tick();abort(signal);
   let shapes=vectors(source,pixels,contours,excluded);
-  const photos=[...embedded,...pictures(source,pixels,page.lines,[...excluded,...shapes.map(shape=>shape.box)],cv),...retainedCharts.map(box=>({box,canvas:crop(source,box)}))];
+  const photos=[...embedded,...tableImages,...pictures(source,pixels,page.lines,[...excluded,...shapes.map(shape=>shape.box)],cv),...retainedCharts.map(box=>({box,canvas:crop(source,box)}))];
   for(const shape of shapes){
     const members=page.lines.filter(line=>!line.preserveImage&&line.box[2]<=shape.box[2]*1.4&&line.box[3]<=shape.box[3]*1.4&&inside(center(line),shape.box)&&!photos.some(photo=>inside(center(line),photo.box)));
     shape.text=members.sort((a,b)=>a.box[1]-b.box[1]||a.box[0]-b.box[0]).map(line=>line.text).join('\n');shape.lineIndices=members.map(line=>line.index);

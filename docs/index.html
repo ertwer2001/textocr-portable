@@ -44,7 +44,7 @@
       </section>
     </div>
     <section class="export-panel" aria-labelledby="exportHeading">
-      <div class="export-settings"><h2 id="exportHeading">匯出文件</h2><label>輸出頁面<select id="exportScope"><option value="selected">選取頁面</option><option value="all">全部頁面</option></select></label><label>Word 格式<select id="wordMode"><option value="editable">保留版面，可編輯文字</option><option value="text">純文字，可編輯段落</option><option value="image">原圖版（文字不可編輯）</option></select></label><label class="check-label"><input type="checkbox" id="forceOCR">PDF 一律重新辨識</label></div>
+      <div class="export-settings"><h2 id="exportHeading">匯出文件</h2><label>輸出頁面<select id="exportScope"><option value="selected">選取頁面</option><option value="all">全部頁面</option></select></label><label>Word 格式<select id="wordMode"><option value="editable">保留版面，可編輯文字與表格</option><option value="text">純文字，可編輯段落</option><option value="image">原圖版（文字不可編輯）</option></select></label><label>Word 字型<select id="wordFont"><option value="">自動估計</option><option value="DFKai-SB">標楷體</option><option value="MingLiU">細明體</option><option value="Microsoft JhengHei">微軟正黑體</option><option value="Arial">Arial</option></select></label><label class="check-label"><input type="checkbox" id="forceOCR">PDF 一律重新辨識</label></div>
       <div class="export-actions"><button data-export="docx" disabled>匯出 Word</button><button data-export="xlsx" disabled>匯出 Excel</button><button data-export="pptx" disabled>匯出 PPT</button><button data-export="txt" disabled>匯出文字</button><button id="exportBoth" disabled>Word＋Excel</button></div>
       <div class="save-row"><button id="folderButton" class="quiet">選擇儲存資料夾</button><span id="folderLabel">使用瀏覽器下載位置</span><a id="lastDownload" hidden>下載剛才的檔案</a></div>
       <div id="exportWarnings" class="export-note" role="status" hidden></div>
@@ -58,6 +58,7 @@
     <h3>3．校對辨識結果</h3><p>右側可直接修正文字。保留每行的位置可維持較好的版面；新增或刪除多行時，可使用 Word「純文字，可編輯段落」。辨識不會取回截圖看不到的公式或資料。</p>
     <h3>4．匯出 Word、Excel、PPT</h3><p>選擇「選取頁面」或「全部頁面」後匯出。尚未辨識的頁面會先辨識。Word 預設輸出可編輯文字；「原圖版」只適合原貌備查。Excel 每頁建立工作表，表格可編輯，非表格內容會列為文字。PPT 每頁一張投影片，文字、辨識出的表格、流程形狀與可靠的圖表資料為可編輯物件；照片是獨立圖片。內嵌報表縮圖太小、縮小工程圖或圖表數字無法可靠辨識時，保留原圖並在匯出區列出需核對的區塊；請使用更清晰的截圖、原始 PDF 或原始圖檔再轉換。</p>
     <h3>Excel 截圖轉成儲存格</h3><p>貼上表格截圖後，直接點「匯出 Excel」。程式會先辨識文字與格線，再重建可編輯儲存格，保留空白欄位、底色、框線、欄寬及列高。「01」等版本編號會保留為文字。可連續貼上多張圖，再選取部分頁面或全部輸出；每個辨識出的表格各建一張工作表。截圖須包含完整列與欄，裁掉的文字、公式和未顯示的資料無法恢復；若出現截斷提示，請補完整截圖。</p>
+    <h3>文件截圖轉成 Word</h3><p>貼上文件圖片，選「保留版面，可編輯文字與表格」後匯出 Word。文字按原位置重建，辨識出的格線表格保留欄寬與合併儲存格，可在 Word 中修改；辨識出的標誌及照片保留圖像。楷體公文可將「Word 字型」改成「標楷體」；開啟 Word 的電腦需有該字型。截圖沒有原始字型與段落設定，細字和印章文字可能誤辨，無法保證逐像素一致。修改成更長的文字後仍需檢查換行、表格高度和分頁。</p>
     <h3>5．儲存與再次開啟</h3><p>可在支援的 Chrome／Edge 點「選擇儲存資料夾」，由你選取並授權；其他瀏覽器使用一般下載。每次匯出使用新名稱，避免覆蓋你已修改的文件。點「下載剛才的檔案」可重新下載；開啟 Word、Excel 或 PPT，請從瀏覽器下載清單或資料夾點檔案。</p>
     <h3>6．離線與隱私</h3><p>文件內容只在你的瀏覽器處理，不上傳辨識伺服器。首次使用需要連線下載網站、模型與元件。點「準備離線使用」完成快取後，可以用同一瀏覽器再次開啟網址；瀏覽器清除快取後需要重新準備。關閉或重新整理網頁會清除目前加入的文件，請先匯出結果。</p>
     <p class="manual-foot">模塊 © CJ Chen 版權所有。開源元件與模型授權請參閱 <a href="licenses.html" target="_blank" rel="noopener">授權資訊</a>。</p>

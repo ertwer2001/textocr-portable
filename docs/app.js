@@ -26,7 +26,7 @@ function syncControls() {
   $('removeSelected').disabled = busy || !selected().length;
   $('recognizeButton').disabled = busy || !selected().length;
   $('cancelButton').hidden = !busy || !controller;
-  for(const id of ['addButton','pasteButton','exampleButton','offlineButton','folderButton','exportScope','wordMode','forceOCR']) $(id).disabled = busy;
+  for(const id of ['addButton','pasteButton','exampleButton','offlineButton','folderButton','exportScope','wordMode','wordFont','forceOCR']) $(id).disabled = busy;
   for(const button of document.querySelectorAll('[data-export],#exportBoth')) button.disabled = busy || !currentScope().length;
   $('textEditor').disabled = busy || !active()?.recognized;
   $('copyText').disabled = busy || !active()?.recognized;
@@ -249,7 +249,7 @@ async function exportKinds(kinds){
     const bundle=kinds.length>1&&!directory ? new globalThis.JSZip() : null;
     for(const kind of kinds){
       checkAbort(signal);status(`正在建立 ${kind.toUpperCase()}（${list.length} 頁）…`,0);
-      const blob=await exportDocument(kind,list,{mode:$('wordMode').value,preparePage:async page=>{checkAbort(signal);await preparePage(page);},releasePage,onProgress:progress=>{if(progress.phase==='zip')status(`正在打包 ${kind.toUpperCase()}…`,progress.percent);}});
+      const blob=await exportDocument(kind,list,{mode:$('wordMode').value,wordFont:$('wordFont').value,preparePage:async page=>{checkAbort(signal);await preparePage(page);},releasePage,onProgress:progress=>{if(progress.phase==='zip')status(`正在打包 ${kind.toUpperCase()}…`,progress.percent);}});
       checkAbort(signal);const name=fileName(kind);
       if(bundle)bundle.file(name,await blob.arrayBuffer());else await save(blob,name);
     }

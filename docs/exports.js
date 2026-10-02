@@ -228,24 +228,79 @@ async function xlsx(tablesInput, numeric = false, sheetNames) {
 }
 
 function wordSection(w,h) { return `<w:sectPr><w:type w:val="nextPage"/><w:pgSz w:w="${round(w*20)}" w:h="${round(h*20)}"/><w:pgMar w:top="0" w:right="0" w:bottom="0" w:left="0" w:header="0" w:footer="0" w:gutter="0"/></w:sectPr>`; }
-function wordPicture(rel,w,h,id) {
+function wordPicture(rel,w,h,id,x=0,y=0,behind=true) {
   const cx=round(w*12700),cy=round(h*12700);
-  return `<w:r><w:drawing><wp:anchor distT="0" distB="0" distL="0" distR="0" simplePos="0" relativeHeight="0" behindDoc="1" locked="0" layoutInCell="1" allowOverlap="1"><wp:simplePos x="0" y="0"/><wp:positionH relativeFrom="page"><wp:posOffset>0</wp:posOffset></wp:positionH><wp:positionV relativeFrom="page"><wp:posOffset>0</wp:posOffset></wp:positionV><wp:extent cx="${cx}" cy="${cy}"/><wp:effectExtent l="0" t="0" r="0" b="0"/><wp:wrapNone/><wp:docPr id="${id}" name="原稿圖形 ${id}"/><wp:cNvGraphicFramePr/><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic><pic:nvPicPr><pic:cNvPr id="${id}" name="原稿圖形"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="${rel}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:anchor></w:drawing></w:r>`;
+  return `<w:r><w:drawing><wp:anchor distT="0" distB="0" distL="0" distR="0" simplePos="0" relativeHeight="${behind?0:1000+id}" behindDoc="${+behind}" locked="0" layoutInCell="0" allowOverlap="1"><wp:simplePos x="0" y="0"/><wp:positionH relativeFrom="page"><wp:posOffset>${round(x*12700)}</wp:posOffset></wp:positionH><wp:positionV relativeFrom="page"><wp:posOffset>${round(y*12700)}</wp:posOffset></wp:positionV><wp:extent cx="${cx}" cy="${cy}"/><wp:effectExtent l="0" t="0" r="0" b="0"/><wp:wrapNone/><wp:docPr id="${id}" name="${behind?'原稿圖形':'保留圖片'} ${id}"/><wp:cNvGraphicFramePr/><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic><pic:nvPicPr><pic:cNvPr id="${id}" name="${behind?'原稿圖形':'保留圖片'}"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="${rel}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:anchor></w:drawing></w:r>`;
 }
-function wordText(line,id,scale) {
-  const [x,y,w,h] = box(line.inkBox||line.box).map(n=>n*scale), size=lineFont(line)*scale,family=xml(line.fontFamily||FONT);
+function wordParagraph(value,size,fg='000000',bold=false,family=FONT,align='left',before=0) {
+  return String(value??'').split('\n').map((text,index)=>`<w:p><w:pPr><w:spacing w:before="${index?0:Math.max(0,round(before))}" w:after="0" w:line="${Math.max(20,round(size*21.2))}" w:lineRule="exact"/><w:jc w:val="${align}"/><w:wordWrap w:val="0"/><w:snapToGrid w:val="0"/></w:pPr><w:r><w:rPr><w:rFonts w:ascii="${xml(family)}" w:hAnsi="${xml(family)}" w:eastAsia="${xml(family)}"/><w:sz w:val="${Math.max(2,round(size*2))}"/><w:color w:val="${color(fg)}"/>${bold?'<w:b/>':''}</w:rPr><w:t xml:space="preserve">${xml(text)}</w:t></w:r></w:p>`).join('');
+}
+function wordTable(entry,page,scale,wordFont='') {
+  const table=tableData(entry),[x,y,pw,ph]=box(entry.box||table.box),wx=sum(table.widths),hy=sum(table.heights),widths=table.widths.map(n=>n/wx*pw),heights=table.heights.map(n=>n/hy*ph),xs=[x],ys=[y];
+  for(const n of widths)xs.push(xs.at(-1)+n);for(const n of heights)ys.push(ys.at(-1)+n);
+  const defaultSizes=editableLines(page).filter(line=>inside(line.box,[x,y,pw,ph])).map(lineFont).sort((a,b)=>a-b),defaultSize=defaultSizes.length?defaultSizes[Math.floor(defaultSizes.length/2)]:12;
+  const borderColor=color(table.borderColor,'000000'),borderSize=clamp(round((table.borderWidth??1)*scale*8),2,96);
+  const borders=['top','left','bottom','right'].map(edge=>`<w:${edge} w:val="single" w:sz="${borderSize}" w:color="${borderColor}"/>`).join('');
+  const rows=table.rows.map((row,r)=>{
+    let cells='';
+    for(let c=0;c<row.length;c++){
+      const merge=table.occupied.get(`${r},${c}`);if(merge&&c>merge[1])continue;
+      const lastC=merge?merge[3]:c,lastR=merge?merge[2]:r,span=lastC-c+1,continued=merge&&r>merge[0];
+      const bounds=[xs[c],ys[r],xs[lastC+1]-xs[c],ys[lastR+1]-ys[r]],members=editableLines(page).filter(line=>inside(line.box,bounds)),cell=table.cellStyles?.[r]?.[c]||{},sizes=members.map(lineFont).sort((a,b)=>a-b);
+      const text=continued?'':row[c],fill=table.fills[r][c],rgb=[0,2,4].map(n=>parseInt(fill.slice(n,n+2),16)),fg=color(cell.color,rgb[0]*299+rgb[1]*587+rgb[2]*114<128000?'FFFFFF':'000000'),bold=cell.bold??false,family=wordFont||cell.fontFamily||table.fontFamily||members[0]?.fontFamily||FONT;
+      const align={l:'left',ctr:'center',r:'right',just:'both'}[cell.align]||'left',preferred=Number(cell.fontSize)||(sizes.length?sizes[Math.floor(sizes.length/2)]:defaultSize);
+      const left=clamp(Number.isFinite(cell.paddingLeft)?cell.paddingLeft:2,0,bounds[2]*.25),right=clamp(Number.isFinite(cell.paddingRight)?cell.paddingRight:2,0,bounds[2]*.25);
+      const size=fitFont(text,preferred,Math.max(1,(bounds[2]-left-right)*.96),Math.max(1,bounds[3]-1),bold,family)*scale;
+      const vm=merge&&lastR>merge[0]?`<w:vMerge${continued?'':' w:val="restart"'}/>`:'';
+      let va={t:'top',ctr:'center',b:'bottom'}[cell.verticalAlign]||'center',paragraphs=wordParagraph(text,size,fg,bold,family,align);
+      const ordered=members.slice().sort((a,b)=>a.box[1]-b.box[1]||a.box[0]-b.box[0]),normalize=value=>String(value).replace(/\s+/g,'');
+      // Keep meaningful gaps inside tall merged cells as native paragraphs.
+      // Use source geometry only when it describes exactly the exported value.
+      if(!continued&&ordered.length>1&&normalize(ordered.map(line=>line.text).join('\n'))===normalize(text)){
+        const groups=[];
+        for(const member of ordered){const [mx,my,mw,mh]=member.inkBox||member.box;let group=groups.find(g=>Math.min(g.y+g.h,my+mh)-Math.max(g.y,my)>=Math.min(g.h,mh)*.45);if(!group){group={y:my,h:mh,members:[]};groups.push(group);}group.members.push(member);group.y=Math.min(group.y,my);group.h=Math.max(group.y+group.h,my+mh)-group.y;}
+        let end=bounds[1]+.5;va=groups.length===1?va:'top';paragraphs='';
+        for(const group of groups.sort((a,b)=>a.y-b.y)){
+          const members=group.members.sort((a,b)=>(a.inkBox||a.box)[0]-(b.inkBox||b.box)[0]),value=members.map(member=>member.text).join(' '),member=members[0],family=wordFont||member.fontFamily||cell.fontFamily||FONT;
+          const font=fitFont(value,Math.min(...members.map(lineFont)),Math.max(1,(bounds[2]-left-right)*.96),Infinity,!!member.bold,family),top=group.y-font*.22;
+          const gap=groups.length===1?0:Math.max(0,top-end);paragraphs+=wordParagraph(value,font*scale,member.color||fg,member.bold??bold,family,align,gap*scale*20);end=Math.max(end,top)+font*1.06;
+        }
+      }
+      cells+=`<w:tc><w:tcPr><w:tcW w:w="${round(bounds[2]*scale*20)}" w:type="dxa"/>${span>1?`<w:gridSpan w:val="${span}"/>`:''}${vm}<w:tcBorders>${borders}</w:tcBorders><w:shd w:val="clear" w:color="auto" w:fill="${fill}"/><w:noWrap/><w:tcMar><w:top w:w="${round(scale*10)}" w:type="dxa"/><w:left w:w="${round(left*scale*20)}" w:type="dxa"/><w:bottom w:w="${round(scale*10)}" w:type="dxa"/><w:right w:w="${round(right*scale*20)}" w:type="dxa"/></w:tcMar><w:vAlign w:val="${va}"/></w:tcPr>${paragraphs}</w:tc>`;
+    }
+    return `<w:tr><w:trPr><w:cantSplit/><w:trHeight w:val="${round(heights[r]*scale*20)}" w:hRule="exact"/></w:trPr>${cells}</w:tr>`;
+  }).join('');
+  return `<w:tbl><w:tblPr><w:tblpPr w:leftFromText="0" w:rightFromText="0" w:topFromText="0" w:bottomFromText="0" w:vertAnchor="page" w:horzAnchor="page" w:tblpX="${round(x*scale*20)}" w:tblpY="${round(y*scale*20)}"/><w:tblOverlap w:val="overlap"/><w:tblW w:w="${round(pw*scale*20)}" w:type="dxa"/><w:tblLayout w:type="fixed"/></w:tblPr><w:tblGrid>${widths.map(n=>`<w:gridCol w:w="${round(n*scale*20)}"/>`).join('')}</w:tblGrid>${rows}</w:tbl>`;
+}
+function wordShape(item,id,scale) {
+  const [x,y,w,h]=box(item.box),kind=item.kind||'rect';if(!['rect','diamond','roundRect','rightArrow'].includes(kind))throw new Error('Word 圖形種類不支援。');
+  const style=`position:absolute;margin-left:${(x*scale).toFixed(3)}pt;margin-top:${(y*scale).toFixed(3)}pt;width:${Math.max(1,w*scale).toFixed(3)}pt;height:${Math.max(1,h*scale).toFixed(3)}pt;z-index:${id};mso-position-horizontal-relative:page;mso-position-vertical-relative:page`;
+  const tag=kind==='rect'?'rect':kind==='roundRect'?'roundrect':'shape',path=kind==='diamond'?'m10800,0l21600,10800,10800,21600,0,10800xe':'m0,5400l16200,5400,16200,0,21600,10800,16200,21600,16200,16200,0,16200xe';
+  const text=item.text?`<v:textbox inset="1pt,1pt,1pt,1pt">${'<w:txbxContent>'+wordParagraph(item.text,fitFont(item.text,item.fontSize||16,w-2,h-2,!!item.bold,item.fontFamily||FONT)*scale,item.textColor||'000000',!!item.bold,item.fontFamily||FONT,'center')+'</w:txbxContent>'}</v:textbox>`:'';
+  return `<w:r><w:pict><v:${tag} id="wordshape${id}" style="${style}" ${tag==='shape'?`coordsize="21600,21600" path="${path}"`:tag==='roundrect'?'arcsize="12%"':''} filled="${item.fill==null?'f':'t'}" fillcolor="#${color(item.fill,'FFFFFF')}" strokecolor="#${color(item.line||item.stroke)}" strokeweight="${((item.width||1)*scale).toFixed(3)}pt">${text}</v:${tag}></w:pict></w:r>`;
+}
+function wordLine(item,id,scale) {
+  if([item.x1,item.y1,item.x2,item.y2].some(n=>!Number.isFinite(n)))throw new Error('Word 連線位置無效。');
+  return `<w:r><w:pict><v:line id="wordline${id}" style="position:absolute;z-index:${id};mso-position-horizontal-relative:page;mso-position-vertical-relative:page" from="${(item.x1*scale).toFixed(3)}pt,${(item.y1*scale).toFixed(3)}pt" to="${(item.x2*scale).toFixed(3)}pt,${(item.y2*scale).toFixed(3)}pt" strokecolor="#${color(item.color)}" strokeweight="${((item.width||1)*scale).toFixed(3)}pt">${item.arrow?'<v:stroke endarrow="block" endarrowwidth="narrow" endarrowlength="short"/>':''}</v:line></w:pict></w:r>`;
+}
+function wordText(line,id,scale,wordFont='') {
+  const bounds=box(line.inkBox||line.box),[x,y,w,h]=bounds.map(n=>n*scale),selected=wordFont||line.fontFamily||FONT;
+  // OCR rectangles include padding, while the positioned frame uses ink bounds.
+  // Refit to that actual frame and allow for Word's font advances (which can be
+  // wider than browser/native Canvas); never expand a short line's tracking.
+  const size=fitFont(line.text,Number(line.fontSize)||lineFont(line),Math.max(1,bounds[2]*.90),Infinity,!!line.bold,selected)*scale,family=xml(selected);
   const style=`position:absolute;margin-left:${x.toFixed(3)}pt;margin-top:${Math.max(0,y-size*.22).toFixed(3)}pt;width:${Math.max(1,w).toFixed(3)}pt;height:${Math.max(h*1.8,size*1.8).toFixed(3)}pt;z-index:${id};mso-position-horizontal-relative:page;mso-position-vertical-relative:page`;
-  return `<w:r><w:pict><v:shape id="text${id}" type="#_x0000_t202" style="${style}" filled="f" stroked="f"><v:textbox inset="0,0,0,0"><w:txbxContent><w:p><w:pPr><w:spacing w:before="0" w:after="0" w:line="${round(size*24)}" w:lineRule="exact"/><w:wordWrap w:val="0"/><w:snapToGrid w:val="0"/></w:pPr><w:r><w:rPr><w:rFonts w:ascii="${family}" w:hAnsi="${family}" w:eastAsia="${family}"/><w:sz w:val="${Math.max(2,round(size*2))}"/><w:color w:val="${color(line.color)}"/>${line.bold?'<w:b/>':''}<w:fitText w:val="${Math.max(20,round(w*20))}" w:id="${id}"/></w:rPr><w:t xml:space="preserve">${xml(line.text)}</w:t></w:r></w:p></w:txbxContent></v:textbox></v:shape></w:pict></w:r>`;
+  return `<w:r><w:pict><v:shape id="text${id}" type="#_x0000_t202" style="${style}" filled="f" stroked="f"><v:textbox inset="0,0,0,0"><w:txbxContent><w:p><w:pPr><w:spacing w:before="0" w:after="0" w:line="${round(size*24)}" w:lineRule="exact"/><w:wordWrap w:val="0"/><w:snapToGrid w:val="0"/></w:pPr><w:r><w:rPr><w:rFonts w:ascii="${family}" w:hAnsi="${family}" w:eastAsia="${family}"/><w:sz w:val="${Math.max(2,round(size*2))}"/><w:color w:val="${color(line.color)}"/>${line.bold?'<w:b/>':''}</w:rPr><w:t xml:space="preserve">${xml(line.text)}</w:t></w:r></w:p></w:txbxContent></v:textbox></v:shape></w:pict></w:r>`;
 }
-async function docx(pages,mode,onProgress,preparePage,releasePage) {
+async function docx(pages,mode,onProgress,preparePage,releasePage,wordFont='') {
   if(!['editable','text','image','original'].includes(mode)) throw new Error('未知的 Word 匯出模式。');
-  if(mode==='editable'&&!pages.some(page=>editableLines(page).length)) throw new Error('沒有可編輯文字；請重新辨識，或明確選用原圖模式。');
+  if(mode==='editable'&&!pages.some(page=>editableLines(page).length||tables(page).length||page.analyses?.shapes?.length)) throw new Error('沒有可編輯文字或表格；請重新辨識，或明確選用原圖模式。');
   const parts={},body=[],relationships=[];let ident=1;
   if(mode==='text') {
     for(const page of pages) {
       try {
         await preparePage?.(page);
-        for(const line of (`【${page.name||'圖片'}】\n`+pageText(page)+'\n').split('\n')) body.push(`<w:p><w:pPr><w:spacing w:after="80"/></w:pPr><w:r><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:eastAsia="${FONT}"/><w:sz w:val="22"/></w:rPr><w:t xml:space="preserve">${xml(line)}</w:t></w:r></w:p>`);
+        for(const line of (`【${page.name||'圖片'}】\n`+pageText(page)+'\n').split('\n')) body.push(`<w:p><w:pPr><w:spacing w:after="80"/></w:pPr><w:r><w:rPr><w:rFonts w:ascii="${xml(wordFont||'Arial')}" w:hAnsi="${xml(wordFont||'Arial')}" w:eastAsia="${xml(wordFont||FONT)}"/><w:sz w:val="22"/></w:rPr><w:t xml:space="preserve">${xml(line)}</w:t></w:r></w:p>`);
       } finally {await releasePage?.(page);}
     }
     body.push('<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1134" w:right="1134" w:bottom="1134" w:left="1134"/></w:sectPr>');
@@ -255,15 +310,46 @@ async function docx(pages,mode,onProgress,preparePage,releasePage) {
     await preparePage?.(page);
     const [pw,ph]=pageSize(page);let w=ph>=pw?595.28:841.89,h=w*ph/pw;
     const limit=Math.min(1,1584/Math.max(w,h));w*=limit;h*=limit;
-    const rel=`rId${index+1}`,name=`page${index+1}.png`, imageMode=mode==='image'||mode==='original';
+    const rel=`rId${relationships.length+1}`,name=`page${index+1}.png`, imageMode=mode==='image'||mode==='original',scale=w/pw;
+    const analysis=page.analyses||{},charts=imageMode?[]:analysis.charts||[],nativeTables=imageMode?[]:tables(page).filter(item=>!charts.some(chart=>inside(item.box||item.table.box,chart.box)));
+    const regions=nativeTables.map(item=>box(item.box||item.table.box)),chartBoxes=charts.map(chart=>box(chart.box));
+    const pictures=imageMode?[]:photos(page).filter(photo=>!chartBoxes.some(bounds=>inside(photo.box,bounds)));
+    const protectedRegions=[...regions,...chartBoxes,...pictures.map(photo=>box(photo.box))];
+    const shapes=imageMode?[]:(analysis.shapes||[]).filter(item=>['rect','diamond','roundRect','rightArrow'].includes(item.kind||'rect')&&!protectedRegions.some(bounds=>inside(item.box,bounds)));
+    const lines=imageMode?[]:(analysis.lines||[]).filter(item=>!protectedRegions.some(bounds=>inside(item.box||[Math.min(item.x1,item.x2),Math.min(item.y1,item.y2),Math.abs(item.x2-item.x1),Math.abs(item.y2-item.y1)],bounds)));
     const image=imageMode?page.canvas:background(page);
+    if(!imageMode){
+      const ctx=image.getContext('2d');
+      for(const bounds of [...regions,...shapes.map(item=>box(item.box))])erase(ctx,bounds,pw,ph,1);
+      for(const item of lines)erase(ctx,item.box||[Math.min(item.x1,item.x2),Math.min(item.y1,item.y2),Math.abs(item.x2-item.x1),Math.abs(item.y2-item.y1)],pw,ph,Math.max(2,(item.width||1)*2));
+      for(const photo of pictures)erase(ctx,photo.box,pw,ph,0);
+      // Word does not yet rebuild charts: restore their complete source pixels,
+      // including labels, rather than silently removing unimplemented objects.
+      for(const [x,y,cw,ch] of chartBoxes)ctx.drawImage(page.canvas,x,y,cw,ch,x,y,cw,ch);
+    }
     try {parts[`word/media/${name}`]=await png(image);}
     finally {if(!imageMode){image.width=1;image.height=1;}}
     relationships.push([rel,'image',`media/${name}`]);
     let content=index===0?'<w:r><w:pict><v:shapetype id="_x0000_t202" coordsize="21600,21600" o:spt="202" path="m,l,21600r21600,l21600,xe"><v:stroke joinstyle="miter"/><v:path gradientshapeok="t" o:connecttype="rect"/></v:shapetype></w:pict></w:r>':'';
     content+=wordPicture(rel,w,h,ident++);
-    if(!imageMode) for(const line of editableLines(page)) content+=wordText(line,ident++,w/pw);
+    if(!imageMode){
+      let native=nativeTables.length;
+      const sourceTextShapes=new Set(shapes.filter(item=>item.lineIndices?.length&&(page.lines||[]).some((line,at)=>!line.preserveImage&&item.lineIndices.includes(line.index??at))));
+      for(const item of shapes){content+=wordShape({...item,...(sourceTextShapes.has(item)?{text:''}:{}),...(wordFont?{fontFamily:wordFont}:{})},ident++,scale);native++;}
+      for(const item of lines){content+=wordLine(item,ident++,scale);native++;}
+      const excluded=[...protectedRegions,...shapes.filter(item=>item.text&&!sourceTextShapes.has(item)).map(item=>item.box)];
+      for(const line of editableLines(page)){if(excluded.some(bounds=>inside(line.box,bounds)))continue;content+=wordText(line,ident++,scale,wordFont);native++;}
+      for(let p=0;p<pictures.length;p++){
+        const photo=pictures[p],[x,y,cw,ch]=box(photo.box);let crop=photo.canvas;
+        if(!crop){crop=canvas(cw,ch);crop.getContext('2d').drawImage(page.canvas,x,y,cw,ch,0,0,cw,ch);}
+        const photoName=`photo${index+1}-${p+1}.png`,rid=`rId${relationships.length+1}`;
+        try{parts[`word/media/${photoName}`]=await png(crop);}finally{if(!photo.canvas){crop.width=1;crop.height=1;}}
+        relationships.push([rid,'image',`media/${photoName}`]);content+=wordPicture(rid,cw*scale,ch*scale,ident++,x*scale,y*scale,false);
+      }
+      if(!native)throw new Error(`「${page.name||index+1}」沒有可編輯文字或物件；請重新辨識，或明確選用原圖模式。`);
+    }
     body.push('<w:p><w:pPr><w:spacing w:after="0" w:line="20" w:lineRule="exact"/></w:pPr>'+content+'</w:p>');
+    for(const entry of nativeTables)body.push(wordTable(entry,page,scale,wordFont));
     const section=wordSection(w,h);
     body.push(index===pages.length-1?section:'<w:p><w:pPr><w:spacing w:after="0" w:line="20" w:lineRule="exact"/>'+section+'</w:pPr></w:p>');
     onProgress?.({phase:'page',current:index+1,total:pages.length});await pause();
@@ -271,7 +357,7 @@ async function docx(pages,mode,onProgress,preparePage,releasePage) {
   }
   parts['word/document.xml']=HEADER+`<w:document xmlns:w="${NS.w}" xmlns:r="${NS.r}" xmlns:a="${NS.a}" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><w:body>${body.join('')}</w:body></w:document>`;
   parts['word/settings.xml']=HEADER+`<w:settings xmlns:w="${NS.w}"><w:displayBackgroundShape/><w:compat><w:compatSetting w:name="compatibilityMode" w:uri="http://schemas.microsoft.com/office/word" w:val="15"/></w:compat></w:settings>`;
-  relationships.push([`rId${pages.length+1}`,'settings','settings.xml']);
+  relationships.push([`rId${relationships.length+1}`,'settings','settings.xml']);
   parts['word/_rels/document.xml.rels']=rels(relationships);parts['_rels/.rels']=rels([['rId1','officeDocument','word/document.xml']]);
   parts['[Content_Types].xml']=contentTypes([['word/document.xml',MIME.docx+'.main+xml'],['word/settings.xml','application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml']],{png:'image/png'});
   return zip(parts,onProgress);
@@ -464,12 +550,12 @@ async function pptx(pages,onProgress,preparePage,releasePage) {
 }
 
 /** pages are already selected, in their intended original order. No uploads occur. */
-export async function exportDocument(kind,pages,{mode='editable',onProgress,preparePage,releasePage}={}) {
+export async function exportDocument(kind,pages,{mode='editable',onProgress,preparePage,releasePage,wordFont=''}={}) {
   if(!MIME[kind])throw new Error('未知的匯出格式。');
   if(!Array.isArray(pages)||!pages.length)throw new Error('請先選取已完成辨識的圖片或頁面。');
   if(kind==='txt')return new Blob(['\uFEFF',pages.map(page=>`【${page.name||'圖片'}】\n${pageText(page)}\n`).join('\n')],{type:MIME.txt});
   let bytes;
-  if(kind==='docx')bytes=await docx(pages,mode,onProgress,preparePage,releasePage);
+  if(kind==='docx')bytes=await docx(pages,mode,onProgress,preparePage,releasePage,wordFont);
   if(kind==='xlsx'){const found=workbookPages(pages);onProgress?.({phase:'tables',current:found.values.length,total:pages.length});bytes=await xlsx(found.values,false,found.names);}
   if(kind==='pptx')bytes=await pptx(pages,onProgress,preparePage,releasePage);
   onProgress?.({phase:'done',current:pages.length,total:pages.length});
