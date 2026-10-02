@@ -4,6 +4,12 @@
 
 介面版權標示為「模塊 © CJ Chen 版權所有」。App 原始碼依 MIT 授權公開；第三方程式與模型依各自授權使用。
 
+## 免 EXE 網頁本機辨識
+
+直接開啟 [TextOCR 網頁版](https://ertwer2001.github.io/textocr-portable/)，以新版 Chrome／Edge 貼上截圖或加入 PDF，選擇頁面並匯出 Word、Excel、PPT 或文字，免安裝、免執行 EXE。辨識與版面分析在瀏覽器本機完成，圖片及 PDF 不送至 OCR 伺服器。
+
+首次需要下載網站與辨識模型，約 54 MB；點「準備離線使用」並完成下載後，可在同一瀏覽器離線使用。清除瀏覽器快取後需重新準備。操作與版面限制見 [網頁版說明](docs/README.md)。
+
 ## 下載與開啟
 
 到 [GitHub Releases](https://github.com/ertwer2001/textocr-portable/releases/latest) 下載 **TextOCR_Windows_x64.zip**。GitHub 自動產生的 **Source code (zip)** 與 **Source code (tar.gz)** 只有來源碼，不能直接當成 App 執行。

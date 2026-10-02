@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="中英文圖片與 PDF 在瀏覽器本機辨識，匯出可編輯 Word、Excel、PowerPoint。">
+  <!-- Official OpenCV Embind builds its JS invocation wrappers at runtime. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-eval' 'wasm-unsafe-eval'; worker-src 'self' blob:; img-src 'self' blob: data:; style-src 'self'; connect-src 'self'; font-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'none'">
+  <title>TextOCR｜中英文文字辨識</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <script src="vendor/jszip.min.js" defer></script>
+  <script type="module" src="app.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="./" aria-label="TextOCR 首頁"><span class="brand-icon" aria-hidden="true">文</span><span>TextOCR<small>中英文文字辨識</small></span></a>
+    <div class="top-actions"><span class="local-badge">文件在本機處理</span><button id="manualButton" class="quiet">操作手冊</button><button id="offlineButton" class="quiet">準備離線使用</button></div>
+  </header>
+  <main>
+    <div class="intro"><h1>貼上圖片，帶走可編輯文件。</h1><p>支援中英文截圖與 PDF。按 <kbd>Ctrl</kbd> + <kbd>V</kbd> 貼圖，或一次加入多個檔案。</p></div>
+    <div class="toolbar">
+      <button id="addButton" class="primary">＋ 加入圖片／PDF</button><input id="fileInput" type="file" accept="image/png,image/jpeg,image/webp,image/bmp,image/gif,application/pdf,.pdf" multiple hidden>
+      <button id="pasteButton">貼上剪貼簿圖片</button><button id="exampleButton" class="quiet">試用範例</button>
+      <span class="toolbar-spacer"></span><button id="recognizeButton" class="primary" disabled>辨識選取頁面</button><button id="cancelButton" hidden>取消</button>
+    </div>
+    <div id="statusArea" class="status-area" role="status" aria-live="polite"><span id="statusText">先加入圖片或 PDF，即可開始。</span><progress id="progress" max="100" value="0" hidden aria-label="處理進度"></progress></div>
+    <div class="workspace" id="dropZone">
+      <aside class="pages-panel" aria-label="頁面清單">
+        <div class="panel-title"><h2>頁面</h2><span id="pageCount">0</span></div>
+        <div class="select-actions"><button id="selectAll" class="text-button" disabled>全選</button><button id="selectNone" class="text-button" disabled>取消選取</button><button id="removeSelected" class="text-button" disabled>移除選取</button></div>
+        <ol id="pageList" class="page-list"></ol>
+        <div id="pageEmpty" class="page-empty">可拖曳檔案到這裡<br>也能連續貼上多張截圖</div>
+      </aside>
+      <section class="preview-panel" aria-label="原圖預覽">
+        <div class="panel-title"><h2>原圖預覽</h2><span id="previewName">尚未選擇頁面</span></div>
+        <div class="preview-content"><div id="previewEmpty" class="preview-empty"><span aria-hidden="true">▧</span><strong>你的圖片會顯示在這裡</strong><p>貼上、拖入或選擇檔案</p></div><img id="previewImage" alt="選取頁面的原始圖片" hidden></div>
+      </section>
+      <section class="text-panel" aria-label="辨識文字">
+        <div class="panel-title"><h2>辨識文字</h2><span id="resultMeta">可先校對再匯出</span></div>
+        <textarea id="textEditor" aria-label="校對辨識文字" placeholder="辨識後會顯示中英文文字，可直接修改。" disabled spellcheck="false"></textarea>
+        <div class="text-tools"><button id="copyText" class="quiet" disabled>複製文字</button><span id="lineCount"></span></div>
+      </section>
+    </div>
+    <section class="export-panel" aria-labelledby="exportHeading">
+      <div class="export-settings"><h2 id="exportHeading">匯出文件</h2><label>輸出頁面<select id="exportScope"><option value="selected">選取頁面</option><option value="all">全部頁面</option></select></label><label>Word 格式<select id="wordMode"><option value="editable">保留版面，可編輯文字</option><option value="text">純文字，可編輯段落</option><option value="image">原圖版（文字不可編輯）</option></select></label><label class="check-label"><input type="checkbox" id="forceOCR">PDF 一律重新辨識</label></div>
+      <div class="export-actions"><button data-export="docx" disabled>匯出 Word</button><button data-export="xlsx" disabled>匯出 Excel</button><button data-export="pptx" disabled>匯出 PPT</button><button data-export="txt" disabled>匯出文字</button><button id="exportBoth" disabled>Word＋Excel</button></div>
+      <div class="save-row"><button id="folderButton" class="quiet">選擇儲存資料夾</button><span id="folderLabel">使用瀏覽器下載位置</span><a id="lastDownload" hidden>下載剛才的檔案</a></div>
+      <p class="export-note">Word 與 PPT 以可編輯文字與物件重建；照片保留為圖片。Excel 儲存格可編輯。複雜圖表及版面請核對後使用。</p>
+    </section>
+  </main>
+  <footer><span id="offlineState">首次使用會下載辨識元件</span><span class="copyright">模塊 © CJ Chen 版權所有</span></footer>
+  <dialog id="manualDialog" aria-labelledby="manualTitle"><div class="dialog-top"><h2 id="manualTitle">操作手冊</h2><button id="closeManual" aria-label="關閉操作手冊">關閉</button></div><div class="manual-content">
+    <h3>1．加入圖片或 PDF</h3><p>點「加入圖片／PDF」可一次選取多個檔案，也能拖入檔案。截圖或複製圖片後，在頁面空白處按 Ctrl+V；多次貼上會依順序加入。正在校對文字時 Ctrl+V 會貼到文字欄。</p>
+    <h3>2．選頁與辨識</h3><p>PDF 會展開成每頁清單。勾選要處理的頁面，點「辨識選取頁面」。選取清單文字可預覽原圖。一般 PDF 優先讀取原有文字；掃描頁使用中英文 OCR。「PDF 一律重新辨識」適用於隱藏文字不正確的 PDF。處理中可按取消，已完成的結果會保留。</p>
+    <h3>3．校對辨識結果</h3><p>右側可直接修正文字。保留每行的位置可維持較好的版面；新增或刪除多行時，可使用 Word「純文字，可編輯段落」。辨識不會取回截圖看不到的公式或資料。</p>
+    <h3>4．匯出 Word、Excel、PPT</h3><p>選擇「選取頁面」或「全部頁面」後匯出。尚未辨識的頁面會先辨識。Word 預設輸出可編輯文字；「原圖版」只適合原貌備查。Excel 每頁建立工作表，表格可編輯，非表格內容會列為文字。PPT 每頁一張投影片，文字、辨識出的表格、流程形狀與可靠的圖表資料為可編輯物件；照片是獨立圖片，無法確定的圖表會保留圖像供核對。</p>
+    <h3>5．儲存與再次開啟</h3><p>可在支援的 Chrome／Edge 點「選擇儲存資料夾」，由你選取並授權；其他瀏覽器使用一般下載。每次匯出使用新名稱，避免覆蓋你已修改的文件。點「下載剛才的檔案」可重新下載；開啟 Word、Excel 或 PPT，請從瀏覽器下載清單或資料夾點檔案。</p>
+    <h3>6．離線與隱私</h3><p>文件內容只在你的瀏覽器處理，不上傳辨識伺服器。首次使用需要連線下載網站、模型與元件。點「準備離線使用」完成快取後，可以用同一瀏覽器再次開啟網址；瀏覽器清除快取後需要重新準備。關閉或重新整理網頁會清除目前加入的文件，請先匯出結果。</p>
+    <p class="manual-foot">模塊 © CJ Chen 版權所有。開源元件與模型授權請參閱 <a href="licenses.html" target="_blank" rel="noopener">授權資訊</a>。</p>
+  </div></dialog>
+</body></html>
