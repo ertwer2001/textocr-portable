@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>中英文文字辨識操作手冊</title><style>
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:#fff;color:#222;font:17px/1.65 "Microsoft JhengHei",system-ui,sans-serif}
+main{max-width:1000px;margin:auto;padding:30px 34px 64px}h1,h2,h3{color:#000;line-height:1.35}h1{font-size:30px;margin:0 0 8px}h2{font-size:24px;margin:42px 0 18px;scroll-margin-top:18px}h3{font-size:19px;margin:24px 0 8px}p{margin:10px 0}li{margin:8px 0}ol{padding-left:28px}.meta{color:#555;font-size:14px}nav{display:flex;flex-wrap:wrap;gap:8px 22px;margin:24px 0 30px;padding:14px 0;border-block:1px solid #ddd}a{color:#174b82;text-underline-offset:3px}a:focus-visible{outline:3px solid #174b82;outline-offset:4px}
+table{width:100%;border-collapse:collapse;margin:18px 0;font-size:15px}th,td{border:1px solid #d9d9d9;padding:12px;text-align:left;vertical-align:middle;overflow-wrap:anywhere}th{background:#eee;color:#000}th:first-child,td:first-child{width:20%}th:nth-child(2),td:nth-child(2){width:25%}tbody tr:nth-child(even){background:#fafafa}footer{margin-top:40px;color:#555;font-size:14px}
+@media(max-width:600px){main{padding:22px 18px 40px}h1{font-size:25px}h2{font-size:22px}table{font-size:14px}th,td{padding:8px}}
+@media print{body{font-size:11pt;line-height:1.35}main{max-width:none;padding:0}nav,.screen-only{display:none}h1{font-size:20pt}h2{font-size:16pt;margin-top:24pt}h3{font-size:12pt}h2,h3{break-after:avoid}li,tr{break-inside:avoid}table{font-size:10pt}thead{display:table-header-group}a{color:#000}}
+</style></head><body><main>
+<h1>中英文文字辨識操作手冊</h1><p class="screen-only meta">本手冊可離線閱讀。按下方章節快速跳轉；列印可按 Ctrl+P。</p><nav aria-label="手冊章節"><a href="#section-1">1 開啟與加入檔案</a><a href="#section-2">2 辨識與挑選匯出範圍</a><a href="#section-3">3 輸出位置與格式選擇</a><a href="#section-4">4 匯出 Word 與純文字</a><a href="#section-5">5 匯出 Excel 和 PPT 及常見問題</a></nav>
+<p class="meta">Windows 可攜式 App  使用版本日期 2026 年 10 月 2 日</p>
+<p>本手冊說明如何把截圖、照片及 PDF 辨識成原文，挑選要匯出的頁面，再存成 Word、Excel、PPT 或文字檔。繁體中文、簡體中文與英文可混合辨識；辨識功能不會翻譯文字。</p>
+<h2 id="section-1">1 開啟與加入檔案</h2>
+<h3>一鍵開啟與隨身碟使用</h3>
+<ol>
+<li>把 ZIP 完整解壓到電腦或隨身碟中可寫入的資料夾，再雙擊 TextOCR.exe。不要直接在 ZIP 內執行。</li>
+<li>攜帶時複製整個 App 資料夾，保留 _internal、模型、settings.json 及輸出結果；只帶 EXE 會無法啟動。</li>
+<li>需要查操作時，按 App 上方的「操作手冊」。手冊以預設瀏覽器開啟，不需安裝 Word，也不需連線。</li>
+</ol>
+<h3>從剪貼簿貼上截圖</h3>
+<ol>
+<li>按 Win + Shift + S，框選要辨識的區域，或在其他程式複製圖片。</li>
+<li>回到 App 按 Ctrl+V，或按「貼上截圖  Ctrl+V」；左側會立即顯示圖片預覽。</li>
+<li>每截一張圖就貼上一次，再截下一張。App 讀取的是目前剪貼簿內容，不會一次匯入剪貼簿歷史；全部貼好後再開始辨識。</li>
+</ol>
+<h3>加入圖片或 PDF</h3>
+<p>按「加入檔案」可一次選多個檔案，也可把檔案拖到上方待辨識清單。支援 PDF、PNG、JPG、JPEG、WEBP、BMP、TIF、TIFF。從檔案總管複製或剪下圖片檔再貼上也可以；App 不會移動或刪除原檔。</p>
+<p>點選清單中的項目可切換預覽。預覽會縮放以配合視窗，辨識使用完整原圖解析度；PDF 在第一頁完成辨識後顯示第一頁預覽。</p>
+<h2 id="section-2">2 辨識與挑選匯出範圍</h2>
+<h3>開始辨識與取消</h3>
+<ol>
+<li>確認清單已加入要處理的檔案，按「開始辨識」。首次載入模型會稍久，請查看下方進度與狀態。</li>
+<li>一般 PDF 優先讀取既有文字；掃描頁會使用 OCR。若掃描 PDF 只有少量文字，或原有文字是亂碼，先勾選「PDF 每頁重新辨識」再開始。</li>
+<li>需要停止時按「取消」。App 會等目前頁面完成後停止，已完成的結果保留，可匯出完成的頁面。</li>
+</ol>
+<p>新增檔案後再按「開始辨識」，會處理尚未完成的項目。重做已完成的檔案時，先匯出需要的結果，按「清除結果」及「清空檔案」，再重新加入原檔辨識。</p>
+<h3>全部圖片或頁面</h3>
+<p>匯出範圍選「全部圖片／頁面」，會輸出目前已完成辨識的所有頁面。後來才加入但尚未辨識的檔案不會包含在內。Word、Excel、PPT 與 TXT 共用這個範圍。</p>
+<h3>只匯出選取的來源檔案</h3>
+<ol>
+<li>在上方待辨識清單點選來源檔案；按住 Ctrl 可逐項多選，按住 Shift 可選連續項目。</li>
+<li>把匯出範圍改為「只匯出選取圖片」，再按需要的匯出按鈕。</li>
+</ol>
+<p>這個選項依上方的來源檔案挑選。選到 PDF 時，會包含該 PDF 所有已辨識完成的頁面；要只取 PDF 的某幾頁，請使用下方的選頁方式。</p>
+<h3>只匯出 PDF 個別頁面或指定截圖</h3>
+<ol>
+<li>辨識完成後按「選擇頁面…」，開啟「選擇匯出頁面」視窗。</li>
+<li>依「序號」「來源圖片／檔案」「原檔頁次」找出頁面，按 Ctrl 或 Shift 多選；也可按「全選」或「取消全選」。</li>
+<li>按「套用」儲存選擇，範圍會切換為「只匯出選取頁面」。按「取消」會保留原先的選擇與範圍。</li>
+<li>按 Word、Excel、PPT 或 TXT 匯出。頁面依原來加入及辨識的順序排列，不依點選先後重新排序。</li>
+</ol>
+<p>例如同一份 PDF 只需要第 2、5 頁，可在選頁視窗依原檔頁次選取兩頁後套用。沒有選取可用頁面時，App 會提示選取，不會自動改成全部匯出。</p>
+<h2 id="section-3">3 輸出位置與格式選擇</h2>
+<h3>設定資料夾與一鍵開啟</h3>
+<ol>
+<li>初次使用的預設位置是 App 同資料夾的「輸出結果」。按「選擇位置」，可改存到電腦、隨身碟或其他可存取資料夾。</li>
+<li>按匯出按鈕後，在另存新檔視窗確認檔名與位置，再按儲存。若換到另一個資料夾，下一次各格式都會預設存到那裡。</li>
+<li>按「開啟最新檔案」以電腦預設程式開啟最後成功輸出的檔案；按「開啟資料夾」或雙擊路徑欄可查看所有輸出。</li>
+</ol>
+<p>輸出位置記錄在 settings.json。App 內部位置以相對路徑記錄，整個資料夾搬到隨身碟後仍可使用；外部路徑需在新電腦上重新確認。App 資料夾無法寫入時，會提示無法記住設定。</p>
+<h3>依用途選擇匯出格式</h3>
+<table><thead>
+<tr><th>格式或模式</th><th>可編輯內容</th><th>適用情況與限制</th></tr>
+</thead><tbody>
+<tr><td>Word<br>保留位置</td><td>已辨識的文字框</td><td>近似保留文字位置與分頁；表格線、圖形仍可能是圖片。</td></tr>
+<tr><td>Word<br>一般段落</td><td>一般 Word 段落</td><td>整理與重新撰寫文字；使用右側修改後的文字，不保留原版面。</td></tr>
+<tr><td>原圖 Word</td><td>文字不可編輯</td><td>完整保留圖片外觀；只需查看原稿時使用。</td></tr>
+<tr><td>Excel</td><td>真正的儲存格</td><td>清楚的表格截圖或 PDF；不推測公式及截圖以外的資料。</td></tr>
+<tr><td>PPT</td><td>文字框及可判定的原生物件</td><td>簡報截圖與流程圖；照片和無完整數據的圖表保留圖片。</td></tr>
+<tr><td>TXT</td><td>純文字</td><td>保存或複製修改後的文字；沒有原稿排版、表格與圖片。</td></tr>
+</tbody></table>
+<p>匯出後請開啟檔案校對。OCR 可能誤認文字、編號與數字；版面還原是近似結果，無法保證與原稿百分之百相同。</p>
+<h3>保存結果與清理畫面</h3>
+<p>「清空檔案」只清除待辨識清單與圖片預覽，已辨識結果與選頁仍保留。「清除結果」會清除目前文字、辨識頁面、選頁與暫存資料，但保留待辨識清單。兩個按鈕都不會刪除已匯出的文件或原始檔案。</p>
+<p>辨識結果只有在匯出後才會存成檔案。關閉 App、清除結果或重做前，先匯出需要保留的內容。</p>
+<h2 id="section-4">4 匯出 Word 與純文字</h2>
+<h3>Word 保留位置模式</h3>
+<ol>
+<li>完成辨識並設定匯出範圍，在 Word 模式選「文字可編輯（保留位置）」。</li>
+<li>按「匯出可編輯 Word」，確認檔名與資料夾後儲存。</li>
+<li>開啟 Word，點進各行文字框內修改文字。若第一次選到文字框邊界，再點進文字內容即可編輯。</li>
+</ol>
+<p>此模式盡量保留原稿文字位置、分頁、圖形與表格線。文字是逐行文字框；表格線與原稿圖形仍可能是圖片，不能像真正 Word 表格那樣增刪列欄。一般 PDF 優先使用原有文字位置與字型資訊，掃描檔與圖片使用辨識到的位置。</p>
+<p>旋轉文字及未辨識區域可能仍是圖片，原圖文字清除可能留下痕跡；若沒有可編輯文字，App 會提示重新辨識。各頁維持獨立分頁，多個來源按加入順序合併，過大的原稿會等比例縮小。</p>
+<h3>Word 一般段落模式與 TXT</h3>
+<ol>
+<li>在右側「辨識結果（可以直接編輯）」中校對文字；在文字區按 Ctrl+V 也可貼入一般文字。</li>
+<li>要可自由重排的 Word，選「文字可編輯（一般段落）」後按「匯出可編輯 Word」；要純文字，按「匯出 TXT」。</li>
+<li>確認匯出範圍後儲存。TXT 與一般段落 Word 都使用右側目前文字，沒有原稿的表格、圖片與位置。</li>
+</ol>
+<p>右側文字修改只會套用到 TXT 和一般段落 Word；保留位置 Word、Excel、PPT 使用原始辨識頁面內容。需要修改這些檔案時，請在匯出後用對應編輯程式校對。</p>
+<p>只匯出選取範圍時，App 會取出各頁對應的文字段落。請在各頁段落內修改，避免把不同頁的文字整段搬移、刪除頁面分界或重排全部文字，以免影響選取範圍。按「複製全部文字」則會複製右側全部內容，不受匯出範圍限制。</p>
+<h3>原圖 Word 的使用時機</h3>
+<p>按獨立的「原圖 Word（不可編輯）」按鈕，會把各頁原圖存入 Word。這個檔案只有圖片，文字完全不能編輯；另存視窗與預設檔名都會註明不可編輯。若需要改文字，請改用上述兩種可編輯模式。</p>
+<h2 id="section-5">5 匯出 Excel 和 PPT 及常見問題</h2>
+<h3>Excel 表格</h3>
+<p>選好範圍後按「匯出 Excel」，每張圖片或 PDF 頁面的主要表格放在不同工作表，合併成一份 .xlsx。結果是可編輯的儲存格，並嘗試還原空白、欄寬、列高、底色、細框線及可確認的合併儲存格。</p>
+<p>資料以文字儲存，保留 01 版次與長編號。App 不會推測公式、日期格式或截圖外的資料。完整且清楚的行列框線最容易辨識；對齊且有重複底色列的無框線表格也會嘗試處理。一頁多個表格目前只擷取主要表格；無法確認結構的頁面會略過並顯示略過頁數。</p>
+<h3>PPT 簡報與流程圖</h3>
+<p>按「匯出 PPT」，每張原稿成為一張投影片，按加入順序合併；比例不同時等比例放入。已辨識文字為可編輯文字框，可判定的表格、方塊、菱形與箭頭重建為 PowerPoint 原生物件。照片、Logo 及複雜產品示意圖保留圖片。</p>
+<p>只有可從數據表讀出完整分類及數值的圖表，才重建為含可修改資料的原生圖表；其他圖表與未判定圖形保留圖片。請核對文字、數字及箭頭方向。</p>
+<h3>辨識或儲存遇到問題</h3>
+<p><strong>文字模糊或表格錯字：</strong>改用清晰、正面、完整的原稿；表格可先放大顯示再截圖。重要編號、金額與專有名詞請對照預覽校正。手寫、印章與傾斜照片可能辨識不準。</p>
+<p><strong>PDF 沒有正常結果：</strong>有密碼的 PDF 先另存成已解除密碼的版本；若只有少量文字或亂碼，勾選「PDF 每頁重新辨識」後重新加入辨識。</p>
+<p><strong>無法匯出或覆寫：</strong>確認資料夾可寫入，隨身碟仍連接且有空間；若同名檔案正在 Word、Excel 或 PowerPoint 開啟，先關閉該檔，或用另一個檔名儲存。</p>
+<p><strong>無法貼上或開啟檔案：</strong>重新截圖後再貼上，或先存成圖片再加入。開啟最新檔案失敗時，確認電腦已設定該副檔名的預設程式。</p>
+<h3>費用 隱私與電腦條件</h3>
+<p>本 App 在電腦本機離線辨識，不需帳號、API 金鑰、Python 安裝或付費訂閱，也不扣 Codex 額度。模型已隨 App 附上，圖片和 PDF 不會上傳或被改寫；輸出檔案與設定都留在使用位置。</p>
+<p>適用 Windows 10／11 64 位元 x64。速度與可處理的檔案量取決於 CPU、記憶體及檔案大小；大型 PDF 可分批處理。已在製作電腦測試，其他電腦仍須確認相容性。此版沒有程式碼簽章，Windows 可能顯示未知發行者；請使用取得的完整原始套件。</p>
+<footer><a href="#">回到頁首</a>　操作內容適用於 2026 年 10 月 2 日的頁面選取版。</footer></main></body></html>

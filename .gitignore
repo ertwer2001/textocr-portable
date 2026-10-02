@@ -1,0 +1,38 @@
+# Local development and build products
+.venv/
+venv/
+env/
+.build-env/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+build/
+build_*/
+dist/
+dist_*/
+package/
+*.spec
+
+# Large model weights and release artifacts
+*.onnx
+*.part
+*.zip
+*.7z
+*.exe
+*.dll
+*.pyd
+
+# Private settings and OCR outputs
+settings.json
+.settings-*
+輸出結果/
+檢查結果.json
+自我檢查*.json
+selftest*.json
+*.log
+~$*
+
+# License source archives are intentional public distribution files.
+!licenses/**/*.tar.bz2
+!licenses/**/*.tar.gz

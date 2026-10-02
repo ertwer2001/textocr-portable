@@ -1,0 +1,5 @@
+﻿開發重建：Windows x64 + Python 3.12；建立虛擬環境並安裝 requirements-lock.txt。
+將 ../_internal/models 與 ../_internal/examples 複製到此 source 資料夾。
+將 ../使用說明.txt、../操作手冊.html、../licenses 複製到此資料夾，再執行 python build.py。
+下載缺少的模型時，可執行 python prepare_models.py（此開發步驟需要網路）。
+App 本身執行不需要 Python 或網路。
