@@ -161,7 +161,7 @@ async function loadCV(){
 }
 async function engine(){
   if(!ocrLoading)ocrLoading=createOCRWorker({modelBase:new URL('./models/',import.meta.url).href,onProgress:progress=>{
-    if(progress.stage==='load')status(progress.message||'首次載入中英文辨識模型…',progress.total?progress.current/progress.total*100:null);
+    if(progress.stage==='loading')status(progress.message||'首次載入中英文辨識模型…',progress.total?progress.current/progress.total*100:null);
   }}).then(result=>(ocr=result)).catch(error=>{ocrLoading=null;throw error;});
   return ocrLoading;
 }
