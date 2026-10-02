@@ -1,5 +1,7 @@
 # TextOCR 網頁版
 
+本說明只適用於網頁版。Windows 桌機版有[獨立操作與下載說明](https://github.com/ertwer2001/textocr-portable/blob/main/README-desktop.md)。兩版分開維護；網頁更新不代表桌機版 ZIP 已更新。
+
 以 Chrome／Edge 開啟網站，貼上圖片或加入 PDF，在瀏覽器本機辨識繁簡中文與英文，匯出可編輯 Word、Excel、PowerPoint 與 TXT。無需執行 TextOCR.exe、Office 或輸入 API 金鑰。
 
 ## 操作
