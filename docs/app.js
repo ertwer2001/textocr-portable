@@ -238,10 +238,13 @@ async function save(blob,name){
 async function exportKinds(kinds){
   const list=[...currentScope()];if(!list.length)return;
   await withBusy(async signal=>{
+    $('exportWarnings').hidden=true;$('exportWarnings').textContent='';
     const imageOnly=kinds.length===1&&kinds[0]==='docx'&&$('wordMode').value==='image';
     if(!imageOnly)await recognizePages(list,signal);
     if(kinds.some(kind=>kind==='xlsx'||kind==='pptx'||kind==='docx'&&$('wordMode').value==='editable')){
       for(let index=0;index<list.length;index++){checkAbort(signal);status(`重建版面 ${index+1}／${list.length}：${list[index].name}`,index/list.length*100);try{await analyze(list[index],signal);}finally{await releasePage(list[index]);}await yieldUI();}
+      const issues=list.flatMap(page=>[...new Set(page.analyses?.issues||[])].map(issue=>`第 ${pages.indexOf(page)+1} 頁：${issue}`));
+      $('exportWarnings').textContent=issues.join('　');$('exportWarnings').hidden=!issues.length;
     }
     const bundle=kinds.length>1&&!directory ? new globalThis.JSZip() : null;
     for(const kind of kinds){
